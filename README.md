@@ -1,4 +1,6 @@
-# Cube (Orc)
+# Cube / Orc
+
+<img src="assets/orc.jpg" alt="orc" style="width:400px;"/>
 
 A DIY orchestrator for educational purposes based on the book [Build an Orchestrator in Go (From Scratch)](https://www.manning.com/books/build-an-orchestrator-in-go-from-scratch)
 
