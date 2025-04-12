@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
+	"github.com/docker/docker/client"
 	"github.com/golang-collections/collections/queue"
 	"github.com/google/uuid"
+	_ "github.com/pkg/errors" // to avoid errors from docker lib
 	"orc/domain/entities"
+	"os"
 	"time"
 )
 
@@ -76,4 +79,51 @@ func main() {
 	}
 
 	fmt.Printf("node: %v\n", node)
+
+	fmt.Println("create a test container")
+	dockerTask, createResult := createContainer()
+	if createResult.Error != nil {
+		fmt.Printf("createResult: %v\n", createResult)
+		os.Exit(1)
+	}
+	time.Sleep(time.Second * 5)
+	fmt.Printf("stopping container %s\n\n", createResult.ContainerID)
+	_ = stopContainer(dockerTask, createResult.ContainerID)
+}
+
+func createContainer() (*entities.Docker, *entities.DockerResult) {
+	config := entities.OrcConfig{
+		Name:  "test-container-1",
+		Image: "postgres:13",
+		Env: []string{
+			"POSTGRES_USER=cube",
+			"POSTGRES_PASSWORD=secret",
+		},
+	}
+
+	dc, _ := client.NewClientWithOpts(client.FromEnv)
+	d := entities.Docker{
+		Client: dc,
+		Config: config,
+	}
+
+	result := d.Run()
+	if result.Error != nil {
+		fmt.Printf("%v\n\n", result.Error)
+		return nil, nil
+	}
+
+	fmt.Printf("Container %s is running with config %v\n", result.ContainerID, config)
+	return &d, &result
+}
+
+func stopContainer(d *entities.Docker, id string) *entities.DockerResult {
+	result := d.Stop(id)
+	if result.Error != nil {
+		fmt.Printf("Error stopping container %s: %v\n", id, result.Error)
+		return &entities.DockerResult{Error: result.Error}
+	}
+
+	fmt.Printf("Container %s is stopped and removed\n", result.ContainerID)
+	return &result
 }
