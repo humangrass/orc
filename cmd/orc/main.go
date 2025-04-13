@@ -42,6 +42,7 @@ func main() {
 	}
 
 	go runTasks(&worker)
+	go worker.CollectStats()
 	err = api.Start()
 	if err != nil {
 		log.Fatal(err)
