@@ -6,27 +6,11 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
-	"github.com/docker/go-connections/nat"
 	"io"
 	"log"
 	"math"
 	"os"
 )
-
-type OrcConfig struct {
-	Name          string
-	AttachStdin   bool
-	AttachStdout  bool
-	AttachStderr  bool
-	ExposedPorts  nat.PortSet
-	Cmd           []string
-	Image         string
-	CPU           float64
-	Memory        int64
-	Disk          int64
-	Env           []string
-	RestartPolicy string
-}
 
 type Docker struct {
 	Client *client.Client
@@ -137,4 +121,15 @@ func (d *Docker) Stop(id string) DockerResult {
 		ContainerID: id,
 		Result:      "success",
 	}
+}
+
+func NewDocker(config OrcConfig) (*Docker, error) {
+	dc, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return nil, err
+	}
+	return &Docker{
+		Client: dc,
+		Config: config,
+	}, nil
 }

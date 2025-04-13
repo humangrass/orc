@@ -16,8 +16,30 @@ const (
 	TaskFailed = iota - 5
 )
 
+var taskStateTransitionMap = map[TaskState][]TaskState{
+	TaskPending:   {TaskScheduled},
+	TaskScheduled: {TaskScheduled, TaskRunning, TaskFailed},
+	TaskRunning:   {TaskRunning, TaskCompleted, TaskFailed},
+	TaskCompleted: {},
+	TaskFailed:    {},
+}
+
+func (s *TaskState) ValidateTransition(destination TaskState) bool {
+	allowed, exists := taskStateTransitionMap[*s]
+	if !exists {
+		return false
+	}
+	for _, state := range allowed {
+		if state == destination {
+			return true
+		}
+	}
+	return false
+}
+
 type Task struct {
 	ID            uuid.UUID
+	ContainerID   string
 	Name          string
 	State         TaskState
 	Image         string
