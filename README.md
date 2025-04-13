@@ -85,3 +85,9 @@ Example output
     }
 ]
 ```
+
+### Get Worker Stats
+
+```bash
+curl --location 'http://localhost:8888/stats'
+```
