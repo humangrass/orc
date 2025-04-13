@@ -30,12 +30,25 @@ func (a *API) initRouter() {
 			r.Delete("/", a.StopTaskHandler)
 		})
 	})
+	a.Router.Route("/stats", func(r chi.Router) {
+		r.Get("/", a.GetStatsHandler)
+	})
 }
 
 func (a *API) Start() error {
 	a.initRouter()
 	err := http.ListenAndServe(fmt.Sprintf("%s:%d", a.Address, a.Port), a.Router)
 	return err
+}
+
+func (a *API) GetStatsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	err := json.NewEncoder(w).Encode(a.Worker.Stats)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 }
 
 func (a *API) StartTaskHandler(w http.ResponseWriter, r *http.Request) {
