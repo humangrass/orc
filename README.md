@@ -22,17 +22,66 @@ go mod download
 go run cmd/orc/main.go
 ```
 
+You may need to edit the `.env` file if `localhost:8888` is busy
+
 ### Example Output
 
 ```text
-starting task
-Collecting stats
-{"status":"Pulling from strm/helloworld-http","id":"latest"}
-{"status":"Digest: sha256:bd44b0ca80c26b5eba984bf498a9c3bab0eb1c59d30d8df3cb2c073937ee4e45"}
-{"status":"Status: Image is up to date for strm/helloworld-http:latest"}
-task 372fc8a6-17a3-407b-aa48-fdf32fa641a5 is running in container 04fd59c1619ed66625bece7aa4fd52bd4205bd52233a362835d1cd249c9b8f68
-Sleepy time!
-stopping task 372fc8a6-17a3-407b-aa48-fdf32fa641a5
-2025/04/13 11:53:27 Attempting to stop container 04fd59c1619ed66625bece7aa4fd52bd4205bd52233a362835d1cd249c9b8f68
-2025/04/13 11:53:36 Stopped and removed container 04fd59c1619ed66625bece7aa4fd52bd4205bd52233a362835d1cd249c9b8f68 for task 372fc8a6-17a3-407b-aa48-fdf32fa641a5
+Starting Orc worker
+host: localhost, port: 8888
+2025/04/13 12:57:25 No tasks left
+2025/04/13 12:57:25 Sleeping for 10 seconds.
+```
+
+### Create new task
+
+```bash
+curl --location 'http://localhost:8888/tasks' \
+--header 'Content-Type: application/json' \
+--data '{
+    "ID": "266592cd-960d-4091-981c-8c25c44b1018",
+    "State": 2,
+    "Task": {
+        "State": 1,
+        "ID": "266592cd-960d-4091-981c-8c25c44b1018",
+        "Name": "test-from-api-777",
+        "Image": "strm/helloworld-http"
+    }
+}'
+```
+
+### Delete task
+
+```bash
+curl --location --request DELETE 'http://localhost:8888/tasks/266592cd-960d-4091-981c-8c25c44b1018' \
+--data ''
+```
+
+### Check tasks
+
+```bash
+curl --location 'http://localhost:8888/tasks'
+```
+
+Example output
+
+```json
+[
+    {
+        "ID": "266592cd-960d-4091-981c-8c25c44b1018",
+        "ContainerID": "fd31597bc7eb16c92cc1b59fc2300d92d58c9795648a71e4d4ac9b5b0ff76b08",
+        "Name": "test-from-api-777",
+        "State": 3,
+        "Image": "strm/helloworld-http",
+        "Memory": 0,
+        "Disk": 0,
+        "ExposedPorts": null,
+        "PortBindings": null,
+        "RestartPolicy": "",
+        "StartsAt": "2025-04-13T12:57:35.5391939+03:00",
+        "FinishedAt": "2025-04-13T12:58:16.9053937+03:00",
+        "CreatedAt": "2025-04-13T12:58:03.8839293+03:00",
+        "UpdatedAt": "2025-04-13T12:58:16.9053937+03:00"
+    }
+]
 ```

@@ -4,46 +4,61 @@ import (
 	"fmt"
 	"github.com/golang-collections/collections/queue"
 	"github.com/google/uuid"
+	"github.com/joho/godotenv"
 	_ "github.com/pkg/errors" // to avoid errors from docker lib
 	"log"
 	"orc/domain/entities"
+	"os"
+	"strconv"
 	"time"
 )
 
 func main() {
-	db := make(map[uuid.UUID]*entities.Task)
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	host := os.Getenv("ORC_HOST")
+	port, err := strconv.Atoi(os.Getenv("ORC_PORT"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Starting Orc worker")
+	fmt.Printf("host: %s, port: %d\n", host, port)
+
 	worker := entities.Worker{
-		Queue: *queue.New(),
-		Db:    db,
+		Name:      "test-worker",
+		Queue:     *queue.New(),
+		Db:        make(map[uuid.UUID]*entities.Task),
+		TaskCount: 0,
 	}
-	task := entities.Task{
-		ID:        uuid.New(),
-		Name:      "test-helloworld-container-1",
-		State:     entities.TaskScheduled,
-		Image:     "strm/helloworld-http",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-
-	fmt.Println("starting task")
-	worker.AddTask(task)
-
-	worker.CollectStats()
-	result := worker.RunTask()
-	if result.Error != nil {
-		log.Fatal(result.Error)
+	api := entities.API{
+		Address: host,
+		Port:    port,
+		Worker:  &worker,
+		Router:  nil,
 	}
 
-	task.ContainerID = result.ContainerID
-	fmt.Printf("task %s is running in container %s\n", task.ID, task.ContainerID)
-	fmt.Println("Sleepy time!")
-	time.Sleep(30 * time.Second)
+	go runTasks(&worker)
+	err = api.Start()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
 
-	fmt.Printf("stopping task %s\n", task.ID)
-	task.State = entities.TaskCompleted
-	worker.AddTask(task)
-	result = worker.RunTask()
-	if result.Error != nil {
-		log.Fatal(result.Error)
+func runTasks(worker *entities.Worker) {
+	for {
+		if worker.Queue.Len() != 0 {
+			result := worker.RunTask()
+			if result.Error != nil {
+				log.Printf("Error running task: %v\n", result.Error)
+			}
+		} else {
+			log.Println("No tasks left")
+		}
+		log.Println("Sleeping for 10 seconds.")
+		time.Sleep(10 * time.Second)
 	}
 }

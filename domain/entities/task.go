@@ -59,6 +59,4 @@ type TaskEvent struct {
 	State       TaskState
 	RequestedAt time.Time
 	Task        Task
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
 }

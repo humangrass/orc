@@ -53,12 +53,15 @@ func (w *Worker) RunTask() DockerResult {
 }
 
 func (w *Worker) AddTask(task Task) {
+	task.CreatedAt = time.Now()
+	task.UpdatedAt = time.Now()
 	w.Queue.Enqueue(task)
 }
 
 func (w *Worker) StartTask(t Task) DockerResult {
 	now := time.Now()
 	t.StartsAt = &now
+	t.UpdatedAt = now
 	config := NewOrcConfig(&t)
 	d, err := NewDocker(config)
 	if err != nil {
@@ -94,9 +97,18 @@ func (w *Worker) StopTask(t Task) DockerResult {
 	now := time.Now()
 
 	t.FinishedAt = &now
+	t.UpdatedAt = now
 	t.State = TaskCompleted
 	w.Db[t.ID] = &t
 	log.Printf("Stopped and removed container %v for task %v\n", t.ContainerID, t.ID)
 
 	return result
+}
+
+func (w *Worker) GetTasks() []Task {
+	tasks := make([]Task, 0, len(w.Db))
+	for _, task := range w.Db {
+		tasks = append(tasks, *task)
+	}
+	return tasks
 }
