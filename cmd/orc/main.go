@@ -25,7 +25,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Starting Orc worker")
+	fmt.Println("Starting Orc")
 	fmt.Printf("host: %s, port: %d\n", host, port)
 
 	worker := entities.Worker{
@@ -43,10 +43,49 @@ func main() {
 
 	go runTasks(&worker)
 	go worker.CollectStats()
-	err = api.Start()
-	if err != nil {
-		log.Fatal(err)
+	go func() {
+		err = api.Start()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	time.Sleep(10 * time.Second)
+	workers := []string{fmt.Sprintf("%s:%d", host, port)}
+	manager := entities.NewManager(workers)
+	for i := 0; i < 3; i++ {
+		task := entities.Task{
+			ID:          uuid.New(),
+			ContainerID: "",
+			Name:        fmt.Sprintf("test-container-%d", i),
+			State:       entities.TaskScheduled,
+			Image:       "strm/helloworld-http",
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		}
+		taskEvent := entities.TaskEvent{
+			ID:          uuid.New(),
+			State:       entities.TaskRunning,
+			RequestedAt: time.Time{},
+			Task:        task,
+		}
+
+		manager.AddTask(taskEvent)
+		manager.SendWork()
 	}
+
+	//go func() {
+	//	for {
+	//		fmt.Printf("[Manager] Updating task from %d workers\n", len(manager.Workers))
+	//		time.Sleep(15 * time.Second)
+	//	}
+	//}()
+	//for {
+	//	for _, t := range manager.TaskDb {
+	//		fmt.Printf("[Manager] Task: id: %s, state: %d\n", t.ID, t.State)
+	//		time.Sleep(15 * time.Second)
+	//	}
+	//}
 }
 
 func runTasks(worker *entities.Worker) {
