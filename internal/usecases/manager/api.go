@@ -1,4 +1,4 @@
-package entities
+package manager
 
 import (
 	"encoding/json"
@@ -7,12 +7,14 @@ import (
 	"github.com/google/uuid"
 	"log"
 	"net/http"
+	"orc/domain/entities"
+	"time"
 )
 
 type API struct {
 	Address string
 	Port    int
-	Worker  *Worker
+	Manager *entities.Manager
 	Router  *chi.Mux
 }
 
@@ -30,9 +32,6 @@ func (a *API) initRouter() {
 			r.Delete("/", a.StopTaskHandler)
 		})
 	})
-	a.Router.Route("/stats", func(r chi.Router) {
-		r.Get("/", a.GetStatsHandler)
-	})
 }
 
 func (a *API) Start() error {
@@ -41,10 +40,10 @@ func (a *API) Start() error {
 	return err
 }
 
-func (a *API) GetStatsHandler(w http.ResponseWriter, r *http.Request) {
+func (a *API) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	err := json.NewEncoder(w).Encode(a.Worker.Stats)
+	err := json.NewEncoder(w).Encode(a.Manager.GetTasks())
 	if err != nil {
 		log.Println(err)
 		return
@@ -55,7 +54,7 @@ func (a *API) StartTaskHandler(w http.ResponseWriter, r *http.Request) {
 	d := json.NewDecoder(r.Body)
 	d.DisallowUnknownFields()
 
-	taskEvent := TaskEvent{}
+	taskEvent := entities.TaskEvent{}
 	err := d.Decode(&taskEvent)
 	if err != nil {
 		msg := fmt.Sprintf("Error unmarshalling body: %v\n", err)
@@ -72,7 +71,7 @@ func (a *API) StartTaskHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	a.Worker.AddTask(taskEvent.Task)
+	a.Manager.AddTask(taskEvent)
 	log.Printf("Task added: %v\n", taskEvent.Task.ID)
 	w.WriteHeader(http.StatusCreated)
 	err = json.NewEncoder(w).Encode(taskEvent)
@@ -85,7 +84,7 @@ func (a *API) StartTaskHandler(w http.ResponseWriter, r *http.Request) {
 func (a *API) GetTaskHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	err := json.NewEncoder(w).Encode(a.Worker.GetTasks())
+	err := json.NewEncoder(w).Encode(a.Manager.GetTasks())
 	if err != nil {
 		log.Println(err)
 		return
@@ -105,16 +104,22 @@ func (a *API) StopTaskHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 	}
 
-	_, ok := a.Worker.Db[tID]
+	taskToStop, ok := a.Manager.TaskDb[tID]
 	if !ok {
 		log.Printf("Task not found: %v\n", tID)
 		w.WriteHeader(http.StatusNotFound)
 	}
 
-	taskToStop := a.Worker.Db[tID]
 	taskCopy := *taskToStop
-	taskCopy.State = TaskCompleted
-	a.Worker.AddTask(taskCopy)
+	taskCopy.State = entities.TaskCompleted
+
+	taskEvent := entities.TaskEvent{
+		ID:          uuid.New(),
+		State:       entities.TaskCompleted,
+		RequestedAt: time.Now(),
+		Task:        taskCopy,
+	}
+	a.Manager.AddTask(taskEvent)
 
 	log.Printf("Added task %v to stop container %v\n", taskToStop.ID, taskToStop.ContainerID)
 	w.WriteHeader(http.StatusNoContent)
