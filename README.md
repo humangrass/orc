@@ -22,21 +22,23 @@ go mod download
 go run cmd/orc/main.go
 ```
 
-You may need to edit the `.env` file if `localhost:8888` is busy
+You may need to edit the `.env` file if the application ports are busy.
 
 ### Example Output
 
 ```text
-Starting Orc worker
-host: localhost, port: 8888
-2025/04/13 12:57:25 No tasks left
-2025/04/13 12:57:25 Sleeping for 10 seconds.
+Starting Orc worker at localhost:8888
+Starting Orc manager at localhost:8000
 ```
 
-### Create new task
+### Examples of API requests // TODO: docs
+
+You can make requests to the manager and workers
+
+#### Create new task
 
 ```bash
-curl --location 'http://localhost:8888/tasks' \
+curl --location 'http://localhost:8000/tasks' \
 --header 'Content-Type: application/json' \
 --data '{
     "ID": "266592cd-960d-4091-981c-8c25c44b1018",
@@ -50,17 +52,17 @@ curl --location 'http://localhost:8888/tasks' \
 }'
 ```
 
-### Delete task
+#### Delete task
 
 ```bash
-curl --location --request DELETE 'http://localhost:8888/tasks/266592cd-960d-4091-981c-8c25c44b1018' \
+curl --location --request DELETE 'http://localhost:8000/tasks/266592cd-960d-4091-981c-8c25c44b1018' \
 --data ''
 ```
 
-### Check tasks
+#### Check tasks
 
 ```bash
-curl --location 'http://localhost:8888/tasks'
+curl --location 'http://localhost:8000/tasks'
 ```
 
 Example output
@@ -86,7 +88,7 @@ Example output
 ]
 ```
 
-### Get Worker Stats
+#### Get Worker Stats
 
 ```bash
 curl --location 'http://localhost:8888/stats'

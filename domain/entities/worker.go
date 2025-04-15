@@ -64,6 +64,21 @@ func (w *Worker) AddTask(task Task) {
 	w.Queue.Enqueue(task)
 }
 
+func (w *Worker) RunTasks() {
+	for {
+		if w.Queue.Len() != 0 {
+			result := w.RunTask()
+			if result.Error != nil {
+				log.Printf("Error running task: %v", result.Error)
+			}
+		} else {
+			log.Println("No tasks to process currently")
+		}
+		log.Println("Sleeping for 10 seconds")
+		time.Sleep(10 * time.Second)
+	}
+}
+
 func (w *Worker) StartTask(t Task) DockerResult {
 	now := time.Now()
 	t.StartsAt = &now

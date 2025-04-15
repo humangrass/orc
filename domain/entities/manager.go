@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"log"
 	"net/http"
+	"time"
 )
 
 type Manager struct {
@@ -33,11 +34,39 @@ func (m *Manager) SelectWorker() string {
 	return m.Workers[newWorker]
 }
 
+func (m *Manager) GetTasks() []*Task {
+	var tasks []*Task
+	for _, task := range m.TaskDb {
+		tasks = append(tasks, task)
+	}
+	return tasks
+}
+
+func (m *Manager) UpdateTasks() {
+	time.Sleep(10 * time.Second)
+	for {
+		log.Println("Checking for task updates from workers")
+		m.updateTasks()
+		log.Println("Task updates completed")
+		log.Println("Sleeping for 15 second")
+		time.Sleep(15 * time.Second)
+	}
+}
+
+func (m *Manager) ProcessTasks() {
+	for {
+		log.Println("Processing any tasks in the queue")
+		m.SendWork()
+		log.Println("Sleeping for 10 second")
+		time.Sleep(10 * time.Second)
+	}
+}
+
 func (m *Manager) AddTask(taskEvent TaskEvent) {
 	m.Pending.Enqueue(taskEvent)
 }
 
-func (m *Manager) UpdateTasks() {
+func (m *Manager) updateTasks() {
 	for _, worker := range m.Workers {
 		log.Printf("Checking woker %v for task updates", worker)
 		url := fmt.Sprintf("http://%s/tasks", worker)

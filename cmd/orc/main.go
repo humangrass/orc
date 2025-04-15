@@ -8,9 +8,10 @@ import (
 	_ "github.com/pkg/errors" // to avoid errors from docker lib
 	"log"
 	"orc/domain/entities"
+	mUseCase "orc/internal/usecases/manager"
+	wUseCase "orc/internal/usecases/worker"
 	"os"
 	"strconv"
-	"time"
 )
 
 func main() {
@@ -19,14 +20,20 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	host := os.Getenv("ORC_HOST")
-	port, err := strconv.Atoi(os.Getenv("ORC_PORT"))
+	whost := os.Getenv("ORC_WORKER_HOST")
+	wport, err := strconv.Atoi(os.Getenv("ORC_WORKER_PORT"))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Starting Orc")
-	fmt.Printf("host: %s, port: %d\n", host, port)
+	mhost := os.Getenv("ORC_MANAGER_HOST")
+	mport, err := strconv.Atoi(os.Getenv("ORC_MANAGER_PORT"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("Starting Orc worker at %s:%d\n", whost, wport)
+	fmt.Printf("Starting Orc manager at %s:%d\n", mhost, mport)
 
 	worker := entities.Worker{
 		Name:      "test-worker",
@@ -34,71 +41,35 @@ func main() {
 		Db:        make(map[uuid.UUID]*entities.Task),
 		TaskCount: 0,
 	}
-	api := entities.API{
-		Address: host,
-		Port:    port,
+	workers := []string{fmt.Sprintf("%s:%d", whost, wport)}
+	manager := entities.NewManager(workers)
+
+	workerApi := wUseCase.API{
+		Address: whost,
+		Port:    wport,
 		Worker:  &worker,
 		Router:  nil,
 	}
+	managerApi := mUseCase.API{
+		Address: mhost,
+		Port:    mport,
+		Manager: manager,
+		Router:  nil,
+	}
 
-	go runTasks(&worker)
+	go worker.RunTasks()
 	go worker.CollectStats()
 	go func() {
-		err = api.Start()
+		err = workerApi.Start()
 		if err != nil {
 			log.Fatal(err)
 		}
 	}()
 
-	time.Sleep(10 * time.Second)
-	workers := []string{fmt.Sprintf("%s:%d", host, port)}
-	manager := entities.NewManager(workers)
-	for i := 0; i < 3; i++ {
-		task := entities.Task{
-			ID:          uuid.New(),
-			ContainerID: "",
-			Name:        fmt.Sprintf("test-container-%d", i),
-			State:       entities.TaskScheduled,
-			Image:       "strm/helloworld-http",
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
-		}
-		taskEvent := entities.TaskEvent{
-			ID:          uuid.New(),
-			State:       entities.TaskRunning,
-			RequestedAt: time.Time{},
-			Task:        task,
-		}
-
-		manager.AddTask(taskEvent)
-		manager.SendWork()
-	}
-
-	//go func() {
-	//	for {
-	//		fmt.Printf("[Manager] Updating task from %d workers\n", len(manager.Workers))
-	//		time.Sleep(15 * time.Second)
-	//	}
-	//}()
-	//for {
-	//	for _, t := range manager.TaskDb {
-	//		fmt.Printf("[Manager] Task: id: %s, state: %d\n", t.ID, t.State)
-	//		time.Sleep(15 * time.Second)
-	//	}
-	//}
-}
-
-func runTasks(worker *entities.Worker) {
-	for {
-		if worker.Queue.Len() != 0 {
-			result := worker.RunTask()
-			if result.Error != nil {
-				log.Printf("Error running task: %v\n", result.Error)
-			}
-		} else {
-			log.Println("No tasks left")
-		}
-		log.Println("Sleeping for 10 seconds.")
-		time.Sleep(10 * time.Second)
+	go manager.ProcessTasks()
+	go manager.UpdateTasks()
+	err = managerApi.Start()
+	if err != nil {
+		log.Fatal(err)
 	}
 }
