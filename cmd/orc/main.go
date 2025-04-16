@@ -59,6 +59,7 @@ func main() {
 
 	go worker.RunTasks()
 	go worker.CollectStats()
+	go worker.UpdateTasks()
 	go func() {
 		err = workerApi.Start()
 		if err != nil {
@@ -68,6 +69,7 @@ func main() {
 
 	go manager.ProcessTasks()
 	go manager.UpdateTasks()
+	go manager.DoHealthChecks()
 	err = managerApi.Start()
 	if err != nil {
 		log.Fatal(err)

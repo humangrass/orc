@@ -133,3 +133,47 @@ func (w *Worker) GetTasks() []Task {
 	}
 	return tasks
 }
+
+func (w *Worker) InspectTask(task Task) DockerInspectResponse {
+	config := NewOrcConfig(&task)
+	docker, err := NewDocker(config)
+	if err != nil {
+		return DockerInspectResponse{Error: err}
+	}
+
+	return docker.Inspect(task.ContainerID)
+}
+
+func (w *Worker) UpdateTasks() {
+	for {
+		log.Println("Checking status of tasks")
+		w.updateTasks()
+		time.Sleep(15 * time.Second)
+	}
+}
+
+func (w *Worker) updateTasks() {
+	for id, task := range w.Db {
+		if task.State == TaskRunning {
+			resp := w.InspectTask(*task)
+			if resp.Error != nil {
+				fmt.Printf("ERROR: %v\n", resp.Error)
+			}
+
+			if resp.Container == nil {
+				log.Printf("No container for running task %v\n", id)
+				w.Db[id].State = TaskFailed
+			}
+			if resp.Container.State.Status == "exited" {
+				log.Printf("Container %v is exited\n", id)
+				w.Db[id].State = TaskFailed
+			}
+			//if resp.Container != nil {
+			//	data, _ := json.MarshalIndent(resp.Container.NetworkSettings, "", "  ")
+			//	log.Printf("Container NetworkSettings: %s\n", string(data))
+			//}
+
+			w.Db[id].HostPorts = resp.Container.NetworkSettings.NetworkSettingsBase.Ports
+		}
+	}
+}

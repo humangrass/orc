@@ -2,6 +2,7 @@ package entities
 
 import (
 	"context"
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
@@ -22,6 +23,11 @@ type DockerResult struct {
 	Action      string
 	ContainerID string
 	Result      string
+}
+
+type DockerInspectResponse struct {
+	Error     error
+	Container *types.ContainerJSON
 }
 
 func (d *Docker) Run() DockerResult {
@@ -121,6 +127,19 @@ func (d *Docker) Stop(id string) DockerResult {
 		ContainerID: id,
 		Result:      "success",
 	}
+}
+
+func (d *Docker) Inspect(containerID string) DockerInspectResponse {
+	dc, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return DockerInspectResponse{Error: err}
+	}
+	ctx := context.Background()
+	resp, err := dc.ContainerInspect(ctx, containerID)
+	if err != nil {
+		return DockerInspectResponse{Error: err}
+	}
+	return DockerInspectResponse{Container: &resp}
 }
 
 func NewDocker(config OrcConfig) (*Docker, error) {
