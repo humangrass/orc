@@ -50,7 +50,6 @@ func (m *Manager) UpdateTasks() {
 		log.Println("Checking for task updates from workers")
 		m.updateTasks()
 		log.Println("Task updates completed")
-		log.Println("Sleeping for 15 second")
 		time.Sleep(15 * time.Second)
 	}
 }
@@ -59,7 +58,6 @@ func (m *Manager) ProcessTasks() {
 	for {
 		log.Println("Processing any tasks in the queue")
 		m.SendWork()
-		log.Println("Sleeping for 10 second")
 		time.Sleep(10 * time.Second)
 	}
 }
@@ -97,13 +95,7 @@ func (m *Manager) updateTasks() {
 				return
 			}
 
-			if m.TaskDb[task.ID].State != task.State {
-				m.TaskDb[task.ID].State = task.State
-			}
-
-			m.TaskDb[task.ID].StartsAt = task.StartsAt
-			m.TaskDb[task.ID].FinishedAt = task.FinishedAt
-			m.TaskDb[task.ID].ContainerID = task.ContainerID
+			m.TaskDb[task.ID] = task
 		}
 	}
 }
@@ -115,10 +107,6 @@ func (m *Manager) SendWork() {
 		taskEvent := event.(TaskEvent)
 		task := taskEvent.Task
 		log.Printf("Pulled %v off pending queue\n", task)
-
-		m.EventDb[taskEvent.ID] = &taskEvent
-		m.WorkerTaskMap[worker] = append(m.WorkerTaskMap[worker], taskEvent.Task.ID)
-		m.TaskWorkerMap[task.ID] = worker
 
 		task.State = TaskScheduled
 		m.TaskDb[task.ID] = &task
@@ -146,13 +134,17 @@ func (m *Manager) SendWork() {
 			return
 		}
 
-		task = Task{}
-		err = d.Decode(&task)
+		taskEvent = TaskEvent{}
+		err = d.Decode(&taskEvent)
 		if err != nil {
 			fmt.Printf("Error decoding response: %s\n", err.Error())
 			return
 		}
-		log.Printf("Received task: %v\n", task)
+		log.Printf("Received task event: %v\n", taskEvent.ID)
+
+		m.EventDb[taskEvent.ID] = &taskEvent
+		m.WorkerTaskMap[worker] = append(m.WorkerTaskMap[worker], task.ID)
+		m.TaskWorkerMap[task.ID] = worker
 	} else {
 		log.Println("No work in the queue")
 	}
@@ -183,7 +175,7 @@ func (m *Manager) checkTaskHealth(task Task) error {
 		return fmt.Errorf("invalid worker address format: %s", w)
 	}
 
-	url := fmt.Sprintf("http://%s/%s%s", worker[0], hostPort, task.HealthCheck)
+	url := fmt.Sprintf("http://%s:%s%s", worker[0], hostPort, task.HealthCheck)
 
 	log.Printf("Calling health check for task %s: %s\n", task.ID, url)
 	resp, err := http.Get(url)

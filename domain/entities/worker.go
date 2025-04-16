@@ -74,7 +74,6 @@ func (w *Worker) RunTasks() {
 		} else {
 			log.Println("No tasks to process currently")
 		}
-		log.Println("Sleeping for 10 seconds")
 		time.Sleep(10 * time.Second)
 	}
 }
@@ -168,12 +167,8 @@ func (w *Worker) updateTasks() {
 				log.Printf("Container %v is exited\n", id)
 				w.Db[id].State = TaskFailed
 			}
-			//if resp.Container != nil {
-			//	data, _ := json.MarshalIndent(resp.Container.NetworkSettings, "", "  ")
-			//	log.Printf("Container NetworkSettings: %s\n", string(data))
-			//}
 
-			w.Db[id].HostPorts = resp.Container.NetworkSettings.NetworkSettingsBase.Ports
+			w.Db[id].HostPorts = resp.Container.NetworkSettings.Ports
 		}
 	}
 }
