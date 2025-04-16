@@ -53,6 +53,9 @@ type Task struct {
 	FinishedAt    *time.Time
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+	HealthCheck   string
+	RestartCount  int
+	HostPorts     nat.PortMap
 }
 
 type TaskEvent struct {

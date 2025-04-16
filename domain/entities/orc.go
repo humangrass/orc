@@ -19,20 +19,17 @@ type OrcConfig struct {
 
 func NewOrcConfig(t *Task) OrcConfig {
 	return OrcConfig{
-		Name:         t.Name,
-		AttachStdin:  false,
-		AttachStdout: false,
-		AttachStderr: false,
-		ExposedPorts: nil,
-		Cmd:          nil,
-		Image:        t.Image,
-		CPU:          0,
-		Memory:       0,
-		Disk:         0,
-		//Env: []string{
-		//	"POSTGRES_USER=cube",
-		//	"POSTGRES_PASSWORD=secret",
-		//},
+		Name:          t.Name,
+		AttachStdin:   false,
+		AttachStdout:  false,
+		AttachStderr:  false,
+		ExposedPorts:  t.ExposedPorts,
+		Cmd:           nil,
+		Image:         t.Image,
+		CPU:           0,
+		Memory:        0,
+		Disk:          0,
+		Env:           nil,
 		RestartPolicy: "",
 	}
 }
