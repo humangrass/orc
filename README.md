@@ -37,17 +37,26 @@ You can make requests to the manager and workers
 
 #### Create new task
 
+Starting container `test-chapter-9.1` with image `timboring/echo-server:latest` on random port. Container health will be checked periodically.
+
 ```bash
 curl --location 'http://localhost:8000/tasks' \
 --header 'Content-Type: application/json' \
 --data '{
-    "ID": "266592cd-960d-4091-981c-8c25c44b1018",
+    "ID": "a7aa1d44-08f6-443e-9378-f5884311019e",
     "State": 2,
     "Task": {
         "State": 1,
-        "ID": "266592cd-960d-4091-981c-8c25c44b1018",
-        "Name": "test-from-api-777",
-        "Image": "strm/helloworld-http"
+        "ID": "bb1d59ef-9fc1-4e4b-a44d-db571eeed203",
+        "Name": "test-chapter-9.1",
+        "Image": "timboring/echo-server:latest",
+        "ExposedPorts": {
+            "7777/tcp": {}
+        },
+        "PortBindings": {
+            "7777/tcp": "7777"
+        },
+        "HealthCheck": "/health"
     }
 }'
 ```
@@ -55,7 +64,7 @@ curl --location 'http://localhost:8000/tasks' \
 #### Delete task
 
 ```bash
-curl --location --request DELETE 'http://localhost:8000/tasks/266592cd-960d-4091-981c-8c25c44b1018' \
+curl --location --request DELETE 'http://localhost:8000/tasks/bb1d59ef-9fc1-4e4b-a44d-db571eeed203' \
 --data ''
 ```
 
@@ -69,22 +78,37 @@ Example output
 
 ```json
 [
-    {
-        "ID": "266592cd-960d-4091-981c-8c25c44b1018",
-        "ContainerID": "fd31597bc7eb16c92cc1b59fc2300d92d58c9795648a71e4d4ac9b5b0ff76b08",
-        "Name": "test-from-api-777",
-        "State": 3,
-        "Image": "strm/helloworld-http",
-        "Memory": 0,
-        "Disk": 0,
-        "ExposedPorts": null,
-        "PortBindings": null,
-        "RestartPolicy": "",
-        "StartsAt": "2025-04-13T12:57:35.5391939+03:00",
-        "FinishedAt": "2025-04-13T12:58:16.9053937+03:00",
-        "CreatedAt": "2025-04-13T12:58:03.8839293+03:00",
-        "UpdatedAt": "2025-04-13T12:58:16.9053937+03:00"
+  {
+    "ID": "bb1d59ef-9fc1-4e4b-a44d-db571eeed203",
+    "ContainerID": "2bddfc71097fae0f0d885284fed9021e569e5de73caf41710dd919c1f47245f0",
+    "Name": "test-chapter-9.1",
+    "State": 3,
+    "Image": "timboring/echo-server:latest",
+    "CPU": 0,
+    "Memory": 0,
+    "Disk": 0,
+    "ExposedPorts": {
+      "7777/tcp": {}
+    },
+    "PortBindings": {
+      "7777/tcp": "7777"
+    },
+    "RestartPolicy": "",
+    "StartsAt": "2025-04-17T01:02:57.390244064+03:00",
+    "FinishedAt": "2025-04-17T01:07:28.350704419+03:00",
+    "CreatedAt": "2025-04-17T01:07:26.336715778+03:00",
+    "UpdatedAt": "2025-04-17T01:07:28.350704419+03:00",
+    "HealthCheck": "/health",
+    "RestartCount": 0,
+    "HostPorts": {
+      "7777/tcp": [
+        {
+          "HostIp": "0.0.0.0",
+          "HostPort": "32789"
+        }
+      ]
     }
+  }
 ]
 ```
 
