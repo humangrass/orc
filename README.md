@@ -27,7 +27,9 @@ You may need to edit the `.env` file if the application ports are busy.
 ### Example Output
 
 ```text
-Starting Orc worker at localhost:8888
+Starting Orc worker-1 at localhost:8888
+Starting Orc worker-2 at localhost:8889
+Starting Orc worker-3 at localhost:8890
 Starting Orc manager at localhost:8000
 ```
 

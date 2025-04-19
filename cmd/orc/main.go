@@ -32,40 +32,89 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("Starting Orc worker at %s:%d\n", whost, wport)
+	fmt.Printf("Starting Orc worker-1 at %s:%d\n", whost, wport)
+	fmt.Printf("Starting Orc worker-2 at %s:%d\n", whost, wport+1)
+	fmt.Printf("Starting Orc worker-3 at %s:%d\n", whost, wport+2)
 	fmt.Printf("Starting Orc manager at %s:%d\n", mhost, mport)
 
-	worker := entities.Worker{
-		Name:      "test-worker",
+	worker1 := entities.Worker{
+		Name:      "test-worker-1",
 		Queue:     *queue.New(),
 		Db:        make(map[uuid.UUID]*entities.Task),
 		TaskCount: 0,
 	}
-	workers := []string{fmt.Sprintf("%s:%d", whost, wport)}
-	manager := entities.NewManager(workers)
+	worker2 := entities.Worker{
+		Name:      "test-worker-2",
+		Queue:     *queue.New(),
+		Db:        make(map[uuid.UUID]*entities.Task),
+		TaskCount: 0,
+	}
+	worker3 := entities.Worker{
+		Name:      "test-worker-3",
+		Queue:     *queue.New(),
+		Db:        make(map[uuid.UUID]*entities.Task),
+		TaskCount: 0,
+	}
 
-	workerApi := wUseCase.API{
+	workerApi1 := wUseCase.API{
 		Address: whost,
 		Port:    wport,
-		Worker:  &worker,
+		Worker:  &worker1,
 		Router:  nil,
 	}
+	workerApi2 := wUseCase.API{
+		Address: whost,
+		Port:    wport + 1,
+		Worker:  &worker2,
+		Router:  nil,
+	}
+	workerApi3 := wUseCase.API{
+		Address: whost,
+		Port:    wport + 2,
+		Worker:  &worker3,
+		Router:  nil,
+	}
+
+	go worker1.RunTasks()
+	go worker1.UpdateTasks()
+	go func() {
+		err = workerApi1.Start()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	go worker2.RunTasks()
+	go worker2.UpdateTasks()
+	go func() {
+		err = workerApi2.Start()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	go worker3.RunTasks()
+	go worker3.UpdateTasks()
+	go func() {
+		err = workerApi3.Start()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	workers := []string{
+		fmt.Sprintf("%s:%d", whost, wport),
+		fmt.Sprintf("%s:%d", whost, wport+1),
+		fmt.Sprintf("%s:%d", whost, wport+2),
+	}
+
+	manager := entities.NewManager(workers, "roundrobin")
 	managerApi := mUseCase.API{
 		Address: mhost,
 		Port:    mport,
 		Manager: manager,
 		Router:  nil,
 	}
-
-	go worker.RunTasks()
-	go worker.CollectStats()
-	go worker.UpdateTasks()
-	go func() {
-		err = workerApi.Start()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}()
 
 	go manager.ProcessTasks()
 	go manager.UpdateTasks()
