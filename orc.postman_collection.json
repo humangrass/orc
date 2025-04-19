@@ -1,0 +1,192 @@
+{
+	"info": {
+		"_postman_id": "6d32a6dd-fd2f-4985-a6a9-f8879308cf35",
+		"name": "orc",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "42230127"
+	},
+	"item": [
+		{
+			"name": "manager tasks",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://{{HOST}}:{{MANAGER_PORT}}/tasks",
+					"protocol": "http",
+					"host": [
+						"{{HOST}}"
+					],
+					"port": "{{MANAGER_PORT}}",
+					"path": [
+						"tasks"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "worker - 1 - tasks",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://{{HOST}}:{{WORKER_1_PORT}}/tasks",
+					"protocol": "http",
+					"host": [
+						"{{HOST}}"
+					],
+					"port": "{{WORKER_1_PORT}}",
+					"path": [
+						"tasks"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "worker - 2 - tasks",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://{{HOST}}:{{WORKER_2_PORT}}/tasks",
+					"protocol": "http",
+					"host": [
+						"{{HOST}}"
+					],
+					"port": "{{WORKER_2_PORT}}",
+					"path": [
+						"tasks"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "worker - 3 - tasks",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://{{HOST}}:{{WORKER_3_PORT}}/tasks",
+					"protocol": "http",
+					"host": [
+						"{{HOST}}"
+					],
+					"port": "{{WORKER_3_PORT}}",
+					"path": [
+						"tasks"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "manager new task",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"ID\": \"a7aa1d44-08f6-443e-9378-f5884311019e\",\r\n    \"State\": 2,\r\n    \"Task\": {\r\n        \"State\": 1,\r\n        \"ID\": \"bb1d59ef-9fc1-4e4b-a44d-db571eeed203\",\r\n        \"Name\": \"test-chapter-9.1\",\r\n        \"Image\": \"timboring/echo-server:latest\",\r\n        \"ExposedPorts\": {\r\n            \"7777/tcp\": {}\r\n        },\r\n        \"PortBindings\": {\r\n            \"7777/tcp\": \"7777\"\r\n        },\r\n        \"HealthCheck\": \"/health\"\r\n    }\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://{{HOST}}:{{MANAGER_PORT}}/tasks",
+					"protocol": "http",
+					"host": [
+						"{{HOST}}"
+					],
+					"port": "{{MANAGER_PORT}}",
+					"path": [
+						"tasks"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "manager delete task",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://{{HOST}}:{{MANAGER_PORT}}/tasks/bb1d59ef-9fc1-4e4b-a44d-db571eeed203",
+					"protocol": "http",
+					"host": [
+						"{{HOST}}"
+					],
+					"port": "{{MANAGER_PORT}}",
+					"path": [
+						"tasks",
+						"bb1d59ef-9fc1-4e4b-a44d-db571eeed203"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "HOST",
+			"value": "localhost",
+			"type": "string"
+		},
+		{
+			"key": "MANAGER_PORT",
+			"value": "8000",
+			"type": "string"
+		},
+		{
+			"key": "WORKER_1_PORT",
+			"value": "8888",
+			"type": "string"
+		},
+		{
+			"key": "WORKER_2_PORT",
+			"value": "8889",
+			"type": "string"
+		},
+		{
+			"key": "WORKER_3_PORT",
+			"value": "8890",
+			"type": "string"
+		}
+	]
+}

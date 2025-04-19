@@ -21,19 +21,21 @@ type Manager struct {
 	WorkerTaskMap map[string][]uuid.UUID
 	TaskWorkerMap map[uuid.UUID]string
 	LastWorker    int
+
+	WorkerNodes []*Node
+	Scheduler   Scheduler
 }
 
-func (m *Manager) SelectWorker() string {
-	var newWorker int
-	if m.LastWorker+1 < len(m.Workers) {
-		newWorker = m.LastWorker + 1
-		m.LastWorker++
-	} else {
-		newWorker = 0
-		m.LastWorker = 0
+func (m *Manager) SelectWorker(task Task) (*Node, error) {
+	candidates := m.Scheduler.SelectCandidateNodes(task, m.WorkerNodes)
+	if candidates == nil {
+		return nil, fmt.Errorf("no worker nodes found for task %s", task.ID)
 	}
 
-	return m.Workers[newWorker]
+	scores := m.Scheduler.Score(task, candidates)
+	selectedNode := m.Scheduler.Pick(scores, candidates)
+
+	return selectedNode, nil
 }
 
 func (m *Manager) GetTasks() []*Task {
@@ -102,13 +104,26 @@ func (m *Manager) updateTasks() {
 
 func (m *Manager) SendWork() {
 	if m.Pending.Len() > 0 {
-		worker := m.SelectWorker()
 		event := m.Pending.Dequeue()
 		taskEvent := event.(TaskEvent)
 		task := taskEvent.Task
 		log.Printf("Pulled %v off pending queue\n", task)
 
 		task.State = TaskScheduled
+		worker, err := m.SelectWorker(task)
+		if err != nil {
+			log.Printf("Error selecting worker for task %s: %v\n", task.ID, err)
+		}
+		taskWorker, ok := m.TaskWorkerMap[task.ID]
+		if ok {
+			persistedTask := m.TaskDb[task.ID]
+			if taskEvent.State == TaskCompleted && persistedTask.State.ValidateTransition(taskEvent.State) {
+				m.stopTask(taskWorker, taskEvent.Task.ID.String())
+				return
+			}
+
+		}
+
 		m.TaskDb[task.ID] = &task
 
 		data, err := json.Marshal(taskEvent)
@@ -116,7 +131,7 @@ func (m *Manager) SendWork() {
 			log.Printf("Unable to marshal task object: %v\n%v", task, err)
 		}
 
-		url := fmt.Sprintf("http://%s/tasks", worker)
+		url := fmt.Sprintf("http://%s/tasks", worker.Name)
 		resp, err := http.Post(url, "application/json", bytes.NewBuffer(data))
 		if err != nil {
 			log.Printf("Error connecting to %v: %v\n", worker, err)
@@ -143,8 +158,8 @@ func (m *Manager) SendWork() {
 		log.Printf("Received task event: %v\n", taskEvent.ID)
 
 		m.EventDb[taskEvent.ID] = &taskEvent
-		m.WorkerTaskMap[worker] = append(m.WorkerTaskMap[worker], task.ID)
-		m.TaskWorkerMap[task.ID] = worker
+		m.WorkerTaskMap[worker.Name] = append(m.WorkerTaskMap[worker.Name], task.ID)
+		m.TaskWorkerMap[task.ID] = worker.Name
 	} else {
 		log.Println("No work in the queue")
 	}
@@ -265,13 +280,51 @@ func (m *Manager) DoHealthChecks() {
 	}
 }
 
-func NewManager(workers []string) *Manager {
+func (m *Manager) stopTask(worker string, taskID string) {
+	client := &http.Client{}
+	url := fmt.Sprintf("http://%s/tasks/%s", worker, taskID)
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		log.Printf("error creating request to delete task %s: %v\n", taskID, err)
+		return
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("error deleting task %s: %v\n", taskID, err)
+		return
+	}
+	if resp.StatusCode != http.StatusNoContent {
+		log.Printf("error sending request: %v\n", err)
+		return
+	}
+	log.Printf("task %s has been scheduled to be stopped\n", taskID)
+}
+
+func NewManager(workers []string, schedulerType string) *Manager {
 	taskDb := make(map[uuid.UUID]*Task)
 	eventDb := make(map[uuid.UUID]*TaskEvent)
 	workerTaskMap := make(map[string][]uuid.UUID)
 	taskWorkerMap := make(map[uuid.UUID]string)
 	for worker := range workers {
 		workerTaskMap[workers[worker]] = []uuid.UUID{}
+	}
+
+	var nodes []*Node
+	for worker := range workers {
+		workerTaskMap[workers[worker]] = []uuid.UUID{}
+
+		nAPI := fmt.Sprintf("http://%v", workers[worker])
+		n := NewNode(workers[worker], nAPI, "worker")
+		nodes = append(nodes, n)
+	}
+
+	var s Scheduler
+	switch schedulerType {
+	case "roundrobin":
+		s = &RoundRobin{Name: "roundrobin"}
+	default:
+		s = &RoundRobin{Name: "roundrobin"}
 	}
 
 	return &Manager{
@@ -282,5 +335,7 @@ func NewManager(workers []string) *Manager {
 		WorkerTaskMap: workerTaskMap,
 		TaskWorkerMap: taskWorkerMap,
 		LastWorker:    0,
+		WorkerNodes:   nodes,
+		Scheduler:     s,
 	}
 }
