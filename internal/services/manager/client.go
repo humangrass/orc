@@ -1,32 +1,19 @@
-package entities
+package manager
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/docker/go-connections/nat"
-	"github.com/golang-collections/collections/queue"
 	"github.com/google/uuid"
 	"log"
 	"net/http"
+	"orc/domain/entities"
 	"strings"
 	"time"
 )
 
-type Manager struct {
-	Pending       queue.Queue
-	TaskDb        map[uuid.UUID]*Task
-	EventDb       map[uuid.UUID]*TaskEvent
-	Workers       []string
-	WorkerTaskMap map[string][]uuid.UUID
-	TaskWorkerMap map[uuid.UUID]string
-	LastWorker    int
-
-	WorkerNodes []*Node
-	Scheduler   Scheduler
-}
-
-func (m *Manager) SelectWorker(task Task) (*Node, error) {
+func (m *Manager) SelectWorker(task entities.Task) (*entities.Node, error) {
 	candidates := m.Scheduler.SelectCandidateNodes(task, m.WorkerNodes)
 	if candidates == nil {
 		return nil, fmt.Errorf("no worker nodes found for task %s", task.ID)
@@ -38,8 +25,8 @@ func (m *Manager) SelectWorker(task Task) (*Node, error) {
 	return selectedNode, nil
 }
 
-func (m *Manager) GetTasks() []*Task {
-	var tasks []*Task
+func (m *Manager) GetTasks() []*entities.Task {
+	var tasks []*entities.Task
 	for _, task := range m.TaskDb {
 		tasks = append(tasks, task)
 	}
@@ -64,7 +51,7 @@ func (m *Manager) ProcessTasks() {
 	}
 }
 
-func (m *Manager) AddTask(taskEvent TaskEvent) {
+func (m *Manager) AddTask(taskEvent entities.TaskEvent) {
 	m.Pending.Enqueue(taskEvent)
 }
 
@@ -82,7 +69,7 @@ func (m *Manager) updateTasks() {
 		}
 
 		d := json.NewDecoder(resp.Body)
-		var tasks []*Task
+		var tasks []*entities.Task
 		err = d.Decode(&tasks)
 		if err != nil {
 			log.Printf("Error unmarshalling tasks: %s\n", err.Error())
@@ -105,11 +92,11 @@ func (m *Manager) updateTasks() {
 func (m *Manager) SendWork() {
 	if m.Pending.Len() > 0 {
 		event := m.Pending.Dequeue()
-		taskEvent := event.(TaskEvent)
+		taskEvent := event.(entities.TaskEvent)
 		task := taskEvent.Task
 		log.Printf("Pulled %v off pending queue\n", task)
 
-		task.State = TaskScheduled
+		task.State = entities.TaskScheduled
 		worker, err := m.SelectWorker(task)
 		if err != nil {
 			log.Printf("Error selecting worker for task %s: %v\n", task.ID, err)
@@ -117,7 +104,7 @@ func (m *Manager) SendWork() {
 		taskWorker, ok := m.TaskWorkerMap[task.ID]
 		if ok {
 			persistedTask := m.TaskDb[task.ID]
-			if taskEvent.State == TaskCompleted && persistedTask.State.ValidateTransition(taskEvent.State) {
+			if taskEvent.State == entities.TaskCompleted && persistedTask.State.ValidateTransition(taskEvent.State) {
 				m.stopTask(taskWorker, taskEvent.Task.ID.String())
 				return
 			}
@@ -149,7 +136,7 @@ func (m *Manager) SendWork() {
 			return
 		}
 
-		taskEvent = TaskEvent{}
+		taskEvent = entities.TaskEvent{}
 		err = d.Decode(&taskEvent)
 		if err != nil {
 			fmt.Printf("Error decoding response: %s\n", err.Error())
@@ -178,7 +165,7 @@ func getHostPort(ports nat.PortMap) (string, error) {
 	return "", fmt.Errorf("no host ports found")
 }
 
-func (m *Manager) checkTaskHealth(task Task) error {
+func (m *Manager) checkTaskHealth(task entities.Task) error {
 	w := m.TaskWorkerMap[task.ID]
 	hostPort, err := getHostPort(task.HostPorts)
 	if err != nil {
@@ -212,28 +199,28 @@ func (m *Manager) checkTaskHealth(task Task) error {
 
 func (m *Manager) doHealthCheck() {
 	for _, task := range m.GetTasks() {
-		if task.State == TaskRunning && task.RestartCount < 3 {
+		if task.State == entities.TaskRunning && task.RestartCount < 3 {
 			err := m.checkTaskHealth(*task)
 			if err != nil {
 				if task.RestartCount < 3 {
 					m.restartTask(task)
 				}
 			}
-		} else if task.State == TaskFailed && task.RestartCount < 3 {
+		} else if task.State == entities.TaskFailed && task.RestartCount < 3 {
 			m.restartTask(task)
 		}
 	}
 }
 
-func (m *Manager) restartTask(task *Task) {
+func (m *Manager) restartTask(task *entities.Task) {
 	worker := m.TaskWorkerMap[task.ID]
-	task.State = TaskScheduled
+	task.State = entities.TaskScheduled
 	task.RestartCount++
 	m.TaskDb[task.ID] = task
 
-	taskEvent := TaskEvent{
+	taskEvent := entities.TaskEvent{
 		ID:          uuid.New(),
-		State:       TaskRunning,
+		State:       entities.TaskRunning,
 		RequestedAt: time.Now(),
 		Task:        *task,
 	}
@@ -263,7 +250,7 @@ func (m *Manager) restartTask(task *Task) {
 		return
 	}
 
-	newTask := Task{}
+	newTask := entities.Task{}
 	err = d.Decode(&newTask)
 	if err != nil {
 		fmt.Printf("Error decoding response: %s\n", err.Error())
@@ -299,43 +286,4 @@ func (m *Manager) stopTask(worker string, taskID string) {
 		return
 	}
 	log.Printf("task %s has been scheduled to be stopped\n", taskID)
-}
-
-func NewManager(workers []string, schedulerType string) *Manager {
-	taskDb := make(map[uuid.UUID]*Task)
-	eventDb := make(map[uuid.UUID]*TaskEvent)
-	workerTaskMap := make(map[string][]uuid.UUID)
-	taskWorkerMap := make(map[uuid.UUID]string)
-	for worker := range workers {
-		workerTaskMap[workers[worker]] = []uuid.UUID{}
-	}
-
-	var nodes []*Node
-	for worker := range workers {
-		workerTaskMap[workers[worker]] = []uuid.UUID{}
-
-		nAPI := fmt.Sprintf("http://%v", workers[worker])
-		n := NewNode(workers[worker], nAPI, "worker")
-		nodes = append(nodes, n)
-	}
-
-	var s Scheduler
-	switch schedulerType {
-	case "roundrobin":
-		s = &RoundRobin{Name: "roundrobin"}
-	default:
-		s = &RoundRobin{Name: "roundrobin"}
-	}
-
-	return &Manager{
-		Pending:       *queue.New(),
-		TaskDb:        taskDb,
-		EventDb:       eventDb,
-		Workers:       workers,
-		WorkerTaskMap: workerTaskMap,
-		TaskWorkerMap: taskWorkerMap,
-		LastWorker:    0,
-		WorkerNodes:   nodes,
-		Scheduler:     s,
-	}
 }

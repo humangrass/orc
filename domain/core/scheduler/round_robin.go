@@ -1,21 +1,18 @@
-package entities
+package scheduler
 
-type Scheduler interface {
-	SelectCandidateNodes(task Task, nodes []*Node) []*Node
-	Score(task Task, nodes []*Node) map[string]float64
-	Pick(scores map[string]float64, candidates []*Node) *Node
-}
+import "orc/domain/entities"
 
 type RoundRobin struct {
 	Name       string
 	LastWorker int
 }
 
-func (r *RoundRobin) SelectCandidateNodes(task Task, nodes []*Node) []*Node {
+func (r *RoundRobin) SelectCandidateNodes(_ entities.Task, nodes []*entities.Node) []*entities.Node {
+	// TODO: алгоритм выбора подходящего кандидата
 	return nodes
 }
 
-func (r *RoundRobin) Score(task Task, nodes []*Node) map[string]float64 {
+func (r *RoundRobin) Score(_ entities.Task, nodes []*entities.Node) map[string]float64 {
 	nodeScores := make(map[string]float64)
 
 	var newWorker int
@@ -38,8 +35,8 @@ func (r *RoundRobin) Score(task Task, nodes []*Node) map[string]float64 {
 	return nodeScores
 }
 
-func (r *RoundRobin) Pick(scores map[string]float64, candidates []*Node) *Node {
-	var bestNode *Node
+func (r *RoundRobin) Pick(scores map[string]float64, candidates []*entities.Node) *entities.Node {
+	var bestNode *entities.Node
 	var lowestScore float64
 	for idx, node := range candidates {
 		if idx == 0 {

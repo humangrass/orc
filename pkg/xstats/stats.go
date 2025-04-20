@@ -1,4 +1,4 @@
-package entities
+package xstats
 
 import (
 	linuxproc "github.com/c9s/goprocinfo/linux"
