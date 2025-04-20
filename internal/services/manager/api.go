@@ -14,7 +14,7 @@ import (
 type API struct {
 	Address string
 	Port    int
-	Manager *entities.Manager
+	Manager *Manager
 	Router  *chi.Mux
 }
 

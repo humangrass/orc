@@ -13,7 +13,7 @@ import (
 type API struct {
 	Address string
 	Port    int
-	Worker  *entities.Worker
+	Worker  *Worker
 	Router  *chi.Mux
 }
 

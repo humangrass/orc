@@ -8,8 +8,8 @@ import (
 	_ "github.com/pkg/errors" // to avoid errors from docker lib
 	"log"
 	"orc/domain/entities"
-	mUseCase "orc/internal/usecases/manager"
-	wUseCase "orc/internal/usecases/worker"
+	"orc/internal/services/manager"
+	"orc/internal/services/worker"
 	"os"
 	"strconv"
 )
@@ -37,38 +37,38 @@ func main() {
 	fmt.Printf("Starting Orc worker-3 at %s:%d\n", whost, wport+2)
 	fmt.Printf("Starting Orc manager at %s:%d\n", mhost, mport)
 
-	worker1 := entities.Worker{
+	worker1 := worker.Worker{
 		Name:      "test-worker-1",
 		Queue:     *queue.New(),
 		Db:        make(map[uuid.UUID]*entities.Task),
 		TaskCount: 0,
 	}
-	worker2 := entities.Worker{
+	worker2 := worker.Worker{
 		Name:      "test-worker-2",
 		Queue:     *queue.New(),
 		Db:        make(map[uuid.UUID]*entities.Task),
 		TaskCount: 0,
 	}
-	worker3 := entities.Worker{
+	worker3 := worker.Worker{
 		Name:      "test-worker-3",
 		Queue:     *queue.New(),
 		Db:        make(map[uuid.UUID]*entities.Task),
 		TaskCount: 0,
 	}
 
-	workerApi1 := wUseCase.API{
+	workerApi1 := worker.API{
 		Address: whost,
 		Port:    wport,
 		Worker:  &worker1,
 		Router:  nil,
 	}
-	workerApi2 := wUseCase.API{
+	workerApi2 := worker.API{
 		Address: whost,
 		Port:    wport + 1,
 		Worker:  &worker2,
 		Router:  nil,
 	}
-	workerApi3 := wUseCase.API{
+	workerApi3 := worker.API{
 		Address: whost,
 		Port:    wport + 2,
 		Worker:  &worker3,
@@ -108,17 +108,17 @@ func main() {
 		fmt.Sprintf("%s:%d", whost, wport+2),
 	}
 
-	manager := entities.NewManager(workers, "roundrobin")
-	managerApi := mUseCase.API{
+	m := manager.NewManager(workers, "roundrobin")
+	managerApi := manager.API{
 		Address: mhost,
 		Port:    mport,
-		Manager: manager,
+		Manager: m,
 		Router:  nil,
 	}
 
-	go manager.ProcessTasks()
-	go manager.UpdateTasks()
-	go manager.DoHealthChecks()
+	go m.ProcessTasks()
+	go m.UpdateTasks()
+	go m.DoHealthChecks()
 	err = managerApi.Start()
 	if err != nil {
 		log.Fatal(err)

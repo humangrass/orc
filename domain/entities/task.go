@@ -51,8 +51,6 @@ type Task struct {
 	RestartPolicy string
 	StartsAt      *time.Time
 	FinishedAt    *time.Time
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
 	HealthCheck   string
 	RestartCount  int
 	HostPorts     nat.PortMap

@@ -1,8 +1,7 @@
-package entities
+package docker
 
 import (
 	"context"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
@@ -13,33 +12,16 @@ import (
 	"os"
 )
 
-type Docker struct {
-	Client *client.Client
-	Config OrcConfig
-}
-
-type DockerResult struct {
-	Error       error
-	Action      string
-	ContainerID string
-	Result      string
-}
-
-type DockerInspectResponse struct {
-	Error     error
-	Container *types.ContainerJSON
-}
-
-func (d *Docker) Run() DockerResult {
+func (d *Docker) Run() Result {
 	ctx := context.Background()
 	reader, err := d.Client.ImagePull(ctx, d.Config.Image, image.PullOptions{})
 	if err != nil {
 		log.Printf("Error pulling image %s: %v\n", d.Config.Image, err)
-		return DockerResult{Error: err}
+		return Result{Error: err}
 	}
 	_, err = io.Copy(os.Stdout, reader)
 	if err != nil {
-		return DockerResult{Error: err}
+		return Result{Error: err}
 	}
 
 	restartPolicy := container.RestartPolicy{
@@ -66,16 +48,16 @@ func (d *Docker) Run() DockerResult {
 	resp, err := d.Client.ContainerCreate(ctx, &cc, &hc, nil, nil, d.Config.Name)
 	if err != nil {
 		log.Printf("Error creating container %s: %v\n", d.Config.Image, err)
-		return DockerResult{Error: err}
+		return Result{Error: err}
 	}
 
 	err = d.Client.ContainerStart(ctx, resp.ID, container.StartOptions{})
 	if err != nil {
 		log.Printf("Error starting container %s - %s: %v\n", d.Config.Image, resp.ID, err)
-		return DockerResult{Error: err}
+		return Result{Error: err}
 	}
 
-	result := DockerResult{
+	result := Result{
 		Action:      "start",
 		Error:       nil,
 		ContainerID: resp.ID,
@@ -102,13 +84,13 @@ func (d *Docker) Run() DockerResult {
 	return result
 }
 
-func (d *Docker) Stop(id string) DockerResult {
+func (d *Docker) Stop(id string) Result {
 	log.Printf("Attempting to stop container %s\n", id)
 	ctx := context.Background()
 	err := d.Client.ContainerStop(ctx, id, container.StopOptions{})
 	if err != nil {
 		log.Printf("Error stopping container %s: %v\n", id, err)
-		return DockerResult{Error: err}
+		return Result{Error: err}
 	}
 
 	err = d.Client.ContainerRemove(ctx, id, container.RemoveOptions{
@@ -118,10 +100,10 @@ func (d *Docker) Stop(id string) DockerResult {
 	})
 	if err != nil {
 		log.Printf("Error removing container %s: %v\n", id, err)
-		return DockerResult{Error: err}
+		return Result{Error: err}
 	}
 
-	return DockerResult{
+	return Result{
 		Error:       nil,
 		Action:      "stop",
 		ContainerID: id,
@@ -129,26 +111,15 @@ func (d *Docker) Stop(id string) DockerResult {
 	}
 }
 
-func (d *Docker) Inspect(containerID string) DockerInspectResponse {
+func (d *Docker) Inspect(containerID string) InspectResponse {
 	dc, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
-		return DockerInspectResponse{Error: err}
+		return InspectResponse{Error: err}
 	}
 	ctx := context.Background()
 	resp, err := dc.ContainerInspect(ctx, containerID)
 	if err != nil {
-		return DockerInspectResponse{Error: err}
+		return InspectResponse{Error: err}
 	}
-	return DockerInspectResponse{Container: &resp}
-}
-
-func NewDocker(config OrcConfig) (*Docker, error) {
-	dc, err := client.NewClientWithOpts(client.FromEnv)
-	if err != nil {
-		return nil, err
-	}
-	return &Docker{
-		Client: dc,
-		Config: config,
-	}, nil
+	return InspectResponse{Container: &resp}
 }

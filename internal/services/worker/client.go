@@ -1,51 +1,44 @@
-package entities
+package worker
 
 import (
 	"fmt"
-	"github.com/golang-collections/collections/queue"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"log"
+	"orc/domain/entities"
+	"orc/internal/infrastructure/docker"
+	"orc/pkg/xstats"
 	"time"
 )
-
-type Worker struct {
-	Name      string
-	Queue     queue.Queue
-	Db        map[uuid.UUID]*Task
-	TaskCount int
-	Stats     *Stats
-}
 
 func (w *Worker) CollectStats() {
 	for {
 		log.Println("Collecting stats...")
-		w.Stats = GetStats()
+		w.Stats = xstats.GetStats()
 		w.Stats.TaskCount = w.TaskCount
 		time.Sleep(15 * time.Second)
 	}
 }
 
-func (w *Worker) RunTask() DockerResult {
+func (w *Worker) RunTask() docker.Result {
 	t := w.Queue.Dequeue()
 	if t == nil {
 		log.Println("Queue is empty")
-		return DockerResult{Error: nil}
+		return docker.Result{Error: nil}
 	}
 
-	taskQueued := t.(Task)
+	taskQueued := t.(entities.Task)
 	taskPersisted := w.Db[taskQueued.ID]
 	if taskPersisted == nil {
 		taskPersisted = &taskQueued
 		w.Db[taskQueued.ID] = taskPersisted
 	}
 
-	var result DockerResult
+	var result docker.Result
 	if taskPersisted.State.ValidateTransition(taskQueued.State) {
 		switch taskQueued.State {
-		case TaskScheduled:
+		case entities.TaskScheduled:
 			result = w.StartTask(taskQueued)
-		case TaskCompleted:
+		case entities.TaskCompleted:
 			result = w.StopTask(taskQueued)
 		default:
 			result.Error = errors.New("unreachable code")
@@ -58,9 +51,7 @@ func (w *Worker) RunTask() DockerResult {
 	return result
 }
 
-func (w *Worker) AddTask(task Task) {
-	task.CreatedAt = time.Now()
-	task.UpdatedAt = time.Now()
+func (w *Worker) AddTask(task entities.Task) {
 	w.Queue.Enqueue(task)
 }
 
@@ -78,36 +69,35 @@ func (w *Worker) RunTasks() {
 	}
 }
 
-func (w *Worker) StartTask(t Task) DockerResult {
+func (w *Worker) StartTask(t entities.Task) docker.Result {
 	now := time.Now()
 	t.StartsAt = &now
-	t.UpdatedAt = now
-	config := NewOrcConfig(&t)
-	d, err := NewDocker(config)
+	config := entities.NewOrcConfig(&t)
+	d, err := docker.NewDocker(config)
 	if err != nil {
-		return DockerResult{Error: err}
+		return docker.Result{Error: err}
 	}
 
 	result := d.Run()
 	if result.Error != nil {
 		log.Printf("Err running task: %v: %v\n", t.ID, result.Error)
-		t.State = TaskFailed
+		t.State = entities.TaskFailed
 		w.Db[t.ID] = &t
 		return result
 	}
 
 	t.ContainerID = result.ContainerID
-	t.State = TaskRunning
+	t.State = entities.TaskRunning
 	w.Db[t.ID] = &t
 
 	return result
 }
 
-func (w *Worker) StopTask(t Task) DockerResult {
-	config := NewOrcConfig(&t)
-	d, err := NewDocker(config)
+func (w *Worker) StopTask(t entities.Task) docker.Result {
+	config := entities.NewOrcConfig(&t)
+	d, err := docker.NewDocker(config)
 	if err != nil {
-		return DockerResult{Error: err}
+		return docker.Result{Error: err}
 	}
 
 	result := d.Stop(t.ContainerID)
@@ -117,30 +107,29 @@ func (w *Worker) StopTask(t Task) DockerResult {
 	now := time.Now()
 
 	t.FinishedAt = &now
-	t.UpdatedAt = now
-	t.State = TaskCompleted
+	t.State = entities.TaskCompleted
 	w.Db[t.ID] = &t
 	log.Printf("Stopped and removed container %v for task %v\n", t.ContainerID, t.ID)
 
 	return result
 }
 
-func (w *Worker) GetTasks() []Task {
-	tasks := make([]Task, 0, len(w.Db))
+func (w *Worker) GetTasks() []entities.Task {
+	tasks := make([]entities.Task, 0, len(w.Db))
 	for _, task := range w.Db {
 		tasks = append(tasks, *task)
 	}
 	return tasks
 }
 
-func (w *Worker) InspectTask(task Task) DockerInspectResponse {
-	config := NewOrcConfig(&task)
-	docker, err := NewDocker(config)
+func (w *Worker) InspectTask(task entities.Task) docker.InspectResponse {
+	config := entities.NewOrcConfig(&task)
+	d, err := docker.NewDocker(config)
 	if err != nil {
-		return DockerInspectResponse{Error: err}
+		return docker.InspectResponse{Error: err}
 	}
 
-	return docker.Inspect(task.ContainerID)
+	return d.Inspect(task.ContainerID)
 }
 
 func (w *Worker) UpdateTasks() {
@@ -153,7 +142,7 @@ func (w *Worker) UpdateTasks() {
 
 func (w *Worker) updateTasks() {
 	for id, task := range w.Db {
-		if task.State == TaskRunning {
+		if task.State == entities.TaskRunning {
 			resp := w.InspectTask(*task)
 			if resp.Error != nil {
 				fmt.Printf("ERROR: %v\n", resp.Error)
@@ -161,11 +150,11 @@ func (w *Worker) updateTasks() {
 
 			if resp.Container == nil {
 				log.Printf("No container for running task %v\n", id)
-				w.Db[id].State = TaskFailed
+				w.Db[id].State = entities.TaskFailed
 			}
 			if resp.Container.State.Status == "exited" {
 				log.Printf("Container %v is exited\n", id)
-				w.Db[id].State = TaskFailed
+				w.Db[id].State = entities.TaskFailed
 			}
 
 			w.Db[id].HostPorts = resp.Container.NetworkSettings.Ports
