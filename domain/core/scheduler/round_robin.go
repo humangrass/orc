@@ -7,12 +7,12 @@ type RoundRobin struct {
 	LastWorker int
 }
 
-func (r *RoundRobin) SelectCandidateNodes(task entities.Task, nodes []*entities.Node) []*entities.Node {
+func (r *RoundRobin) SelectCandidateNodes(_ entities.Task, nodes []*entities.Node) []*entities.Node {
 	// TODO: алгоритм выбора подходящего кандидата
 	return nodes
 }
 
-func (r *RoundRobin) Score(task entities.Task, nodes []*entities.Node) map[string]float64 {
+func (r *RoundRobin) Score(_ entities.Task, nodes []*entities.Node) map[string]float64 {
 	nodeScores := make(map[string]float64)
 
 	var newWorker int

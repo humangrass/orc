@@ -40,7 +40,7 @@ func (a *API) Start() error {
 	return err
 }
 
-func (a *API) GetTasksHandler(w http.ResponseWriter, r *http.Request) {
+func (a *API) GetTasksHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	err := json.NewEncoder(w).Encode(a.Manager.GetTasks())
